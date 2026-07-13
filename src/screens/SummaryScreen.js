@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { colors, radius } from "../theme";
 import HorizonMark from "../components/HorizonMark";
-import { getMeals, getInterests, getTasks, setTasks } from "../storage/preferences";
+import { getMeals, getInterests, getTasks, setTasks, getHabits } from "../storage/preferences";
 import { TextInput, Pressable } from "react-native";
 import { isCalendarConnected, fetchTodayEvents } from "../services/googleCalendar";
 import { nearbyLeisure } from "../services/places";
@@ -85,6 +85,33 @@ function TaskItem({ task, onToggle }) {
   );
 }
 
+
+function getGreetingCard(timeline, tasks, habits) {
+  const hour = new Date().getHours();
+  const pendingTasks = tasks.filter((t) => !t.done).length;
+  const doneTasks = tasks.filter((t) => t.done).length;
+  const habitsToday = habits.filter((h) => h.lastCheckedDate === new Date().toISOString().slice(0, 10)).length;
+
+  if (hour >= 5 && hour < 12) {
+    return {
+      title: "Bom dia! ☀️",
+      message: `Você tem ${timeline.length} compromisso${timeline.length !== 1 ? "s" : ""} e ${pendingTasks} tarefa${pendingTasks !== 1 ? "s" : ""} pendente${pendingTasks !== 1 ? "s" : ""} hoje. Bora começar?`,
+    };
+  }
+  if (hour >= 12 && hour < 18) {
+    return {
+      title: "Boa tarde",
+      message: pendingTasks > 0
+        ? `Ainda restam ${pendingTasks} tarefa${pendingTasks !== 1 ? "s" : ""} pra hoje.`
+        : "Você já deu conta de tudo que tinha planejado. 🎉",
+    };
+  }
+  return {
+    title: "Resumo do seu dia",
+    message: `Você completou ${doneTasks} tarefa${doneTasks !== 1 ? "s" : ""} e manteve ${habitsToday} hábito${habitsToday !== 1 ? "s" : ""} em dia hoje.`,
+  };
+}
+
 export default function SummaryScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -95,12 +122,15 @@ export default function SummaryScreen() {
   const [tasks, setTasksState] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("media");
+  const [habits, setHabitsState] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const meals = await getMeals();
+      const storedHabits = await getHabits();
+      setHabitsState(storedHabits);
       const hasCalendar = await isCalendarConnected();
       setConnected(hasCalendar);
 
@@ -179,6 +209,17 @@ export default function SummaryScreen() {
         {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
       </Text>
       <Text style={{ fontSize: 24, fontWeight: "700", color: colors.ink, marginBottom: 12 }}>Resumo do seu dia</Text>
+
+      {(() => {
+        const greeting = getGreetingCard(timeline, tasks, habits);
+        return (
+          <View style={{ backgroundColor: colors.ink, borderRadius: radius.lg, padding: 18, marginBottom: 20 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff", marginBottom: 4 }}>{greeting.title}</Text>
+            <Text style={{ fontSize: 13, color: "#E8E4DC" }}>{greeting.message}</Text>
+          </View>
+        );
+      })()}
+
 
       {!connected && (
         <View style={styles.hintCard}>
