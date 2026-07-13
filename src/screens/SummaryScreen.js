@@ -5,7 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { colors, radius } from "../theme";
 import HorizonMark from "../components/HorizonMark";
-import { getMeals, getInterests } from "../storage/preferences";
+import { getMeals, getInterests, getTasks, setTasks } from "../storage/preferences";
+import { TextInput, Pressable } from "react-native";
 import { isCalendarConnected, fetchTodayEvents } from "../services/googleCalendar";
 import { nearbyLeisure } from "../services/places";
 
@@ -49,6 +50,41 @@ function buildTimeline(meals, events) {
   return items.sort((a, b) => a.time.localeCompare(b.time));
 }
 
+
+const PRIORITY_COLORS = { alta: "#C0392B", media: "#B8860B", baixa: "#4A7A4A" };
+const PRIORITY_LABELS = { alta: "Alta", media: "Média", baixa: "Baixa" };
+
+function TaskItem({ task, onToggle }) {
+  return (
+    <Pressable
+      onPress={() => onToggle(task.id)}
+      style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.line }}
+    >
+      <Ionicons
+        name={task.done ? "checkbox" : "square-outline"}
+        size={20}
+        color={task.done ? colors.brass : colors.inkSoft}
+      />
+      <Text
+        style={{
+          flex: 1,
+          marginLeft: 10,
+          fontSize: 14,
+          color: task.done ? colors.inkSoft : colors.ink,
+          textDecorationLine: task.done ? "line-through" : "none",
+        }}
+      >
+        {task.title}
+      </Text>
+      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: PRIORITY_COLORS[task.priority] + "22" }}>
+        <Text style={{ fontSize: 10, fontWeight: "700", color: PRIORITY_COLORS[task.priority] }}>
+          {PRIORITY_LABELS[task.priority]}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function SummaryScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -56,6 +92,9 @@ export default function SummaryScreen() {
   const [timeline, setTimeline] = useState([]);
   const [leisure, setLeisure] = useState([]);
   const [leisureError, setLeisureError] = useState(null);
+  const [tasks, setTasksState] = useState([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState("media");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,10 +136,40 @@ export default function SummaryScreen() {
     }
   }, []);
 
+  const loadTasks = useCallback(async () => {
+    const stored = await getTasks();
+    setTasksState(stored);
+  }, []);
+
+  const toggleTask = async (id) => {
+    const updated = tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
+    setTasksState(updated);
+    await setTasks(updated);
+  };
+
+  const addTask = async () => {
+    const title = newTaskTitle.trim();
+    if (!title) return;
+    const updated = [
+      ...tasks,
+      { id: Date.now().toString(), title, priority: newTaskPriority, done: false },
+    ];
+    setTasksState(updated);
+    await setTasks(updated);
+    setNewTaskTitle("");
+  };
+
+  const priorityRank = { alta: 0, media: 1, baixa: 2 };
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return priorityRank[a.priority] - priorityRank[b.priority];
+  });
+
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      loadTasks();
+    }, [load, loadTasks])
   );
 
   return (
@@ -135,6 +204,51 @@ export default function SummaryScreen() {
           )}
         </View>
       )}
+
+
+      <Text style={styles.sectionLabel}>Suas tarefas</Text>
+      <View style={styles.card}>
+        {sortedTasks.length === 0 ? (
+          <Text style={{ fontSize: 13, color: colors.inkSoft, marginBottom: 12 }}>Nenhuma tarefa ainda. Adicione uma abaixo.</Text>
+        ) : (
+          sortedTasks.map((task) => <TaskItem key={task.id} task={task} onToggle={toggleTask} />)
+        )}
+
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12, gap: 8 }}>
+          <TextInput
+            value={newTaskTitle}
+            onChangeText={setNewTaskTitle}
+            placeholder="Nova tarefa..."
+            placeholderTextColor={colors.inkSoft}
+            style={{ flex: 1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: colors.ink }}
+            onSubmitEditing={addTask}
+          />
+          <Pressable onPress={addTask} style={{ backgroundColor: colors.brass, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 9 }}>
+            <Ionicons name="add" size={18} color="#fff" />
+          </Pressable>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+          {["alta", "media", "baixa"].map((p) => (
+            <Pressable
+              key={p}
+              onPress={() => setNewTaskPriority(p)}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 999,
+                backgroundColor: newTaskPriority === p ? PRIORITY_COLORS[p] : "transparent",
+                borderWidth: 1,
+                borderColor: PRIORITY_COLORS[p],
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: "600", color: newTaskPriority === p ? "#fff" : PRIORITY_COLORS[p] }}>
+                {PRIORITY_LABELS[p]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
 
       <Text style={styles.sectionLabel}>Lazer perto de você</Text>
       {leisureError ? (

@@ -10,6 +10,7 @@ const KEYS = {
   INTERESTS: "anjel:interests",
   CONSENT_LOG: "anjel:consentLog",
   BOOKS: "anjel:books",
+  TASKS: "anjel:tasks",
 };
 
 const DEFAULT_PERMISSIONS = {
@@ -75,6 +76,17 @@ export async function getBooks() {
 
 export async function setBooks(books) {
   await AsyncStorage.setItem(KEYS.BOOKS, JSON.stringify(books));
+}
+
+
+// Tarefas: [{ id, title, priority: "alta"|"media"|"baixa", done, dueTime }]
+export async function getTasks() {
+  const raw = await AsyncStorage.getItem(KEYS.TASKS);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function setTasks(tasks) {
+  await AsyncStorage.setItem(KEYS.TASKS, JSON.stringify(tasks));
 }
 
 export async function isOnboardingDone() {
