@@ -1,0 +1,180 @@
+import React, { useCallback, useState } from "react";
+import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, radius } from "../theme";
+import HorizonMark from "../components/HorizonMark";
+import { isCalendarConnected } from "../services/googleCalendar";
+import { listRecentEmails } from "../services/gmail";
+import { listVoicemails, searchFlights } from "../services/executiveBackend";
+
+function SectionLabel({ children }) {
+  return <Text style={styles.sectionLabel}>{children}</Text>;
+}
+
+function EmailRow({ subject, from, tag, level }) {
+  const tagColor = level === "high" ? colors.alert : colors.sage;
+  return (
+    <View style={styles.rowCard}>
+      <Ionicons name="mail-outline" size={15} color={colors.inkSoft} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, marginLeft: 10, marginRight: 10 }}>
+        <Text style={{ fontSize: 13, fontWeight: "500", color: colors.ink }} numberOfLines={1}>{subject}</Text>
+        <Text style={{ fontSize: 11.5, color: colors.inkSoft }} numberOfLines={1}>{from}</Text>
+      </View>
+      <View style={{ backgroundColor: tagColor + "22", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+        <Text style={{ fontSize: 10.5, fontWeight: "700", color: tagColor }}>{tag}</Text>
+      </View>
+    </View>
+  );
+}
+
+// NOTE: exemplo de rota/data fixos pra ilustrar a busca de voos. Numa versão
+// completa, esses campos viriam de um formulário preenchido pelo usuário.
+const EXAMPLE_TRIP = { origin: "CGR", destination: "GYN", date: "2026-07-22" };
+
+export default function ExecutiveScreen() {
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [emails, setEmails] = useState([]);
+  const [emailError, setEmailError] = useState(null);
+  const [voicemails, setVoicemails] = useState([]);
+  const [voicemailError, setVoicemailError] = useState(null);
+  const [flights, setFlights] = useState(null);
+  const [flightState, setFlightState] = useState("idle"); // idle | loading | done | error
+
+  const load = useCallback(async () => {
+    const connected = await isCalendarConnected();
+    setGoogleConnected(connected);
+
+    if (connected) {
+      try {
+        setEmails(await listRecentEmails(5));
+        setEmailError(null);
+      } catch (e) {
+        setEmailError(e.message);
+      }
+    }
+
+    try {
+      setVoicemails(await listVoicemails());
+      setVoicemailError(null);
+    } catch (e) {
+      setVoicemailError(e.message);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const runFlightSearch = async () => {
+    setFlightState("loading");
+    try {
+      setFlights(await searchFlights(EXAMPLE_TRIP));
+      setFlightState("done");
+    } catch (e) {
+      setFlightState("error");
+    }
+  };
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: colors.mist }} contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
+      <HorizonMark />
+      <Text style={{ fontSize: 24, fontWeight: "700", color: colors.ink, marginBottom: 4 }}>Modo Executivo</Text>
+      <Text style={{ fontSize: 13, color: colors.inkSoft, marginBottom: 18 }}>
+        Triagem de comunicação, viagem e pagamentos — nada é enviado ou reservado sem sua confirmação.
+      </Text>
+
+      <SectionLabel>E-mails não lidos</SectionLabel>
+      {!googleConnected ? (
+        <Text style={styles.hint}>Conecte sua conta Google em Ajustes pra ver a triagem de e-mail aqui.</Text>
+      ) : emailError ? (
+        <Text style={{ fontSize: 12.5, color: colors.alert, marginBottom: 16 }}>{emailError}</Text>
+      ) : emails.length === 0 ? (
+        <ActivityIndicator color={colors.brass} style={{ marginBottom: 16 }} />
+      ) : (
+        emails.map((e) => <EmailRow key={e.id} {...e} />)
+      )}
+
+      <SectionLabel>Recados por telefone</SectionLabel>
+      {voicemailError ? (
+        <Text style={{ fontSize: 12.5, color: colors.inkSoft, marginBottom: 16 }}>
+          Configure o backend de telefonia (Twilio) pra ver recados aqui.
+        </Text>
+      ) : voicemails.length === 0 ? (
+        <Text style={styles.hint}>Nenhum recado ainda.</Text>
+      ) : (
+        voicemails.map((v) => (
+          <View key={v.id} style={styles.rowCard}>
+            <Ionicons name="call-outline" size={15} color={colors.inkSoft} style={{ marginTop: 2 }} />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: "500", color: colors.ink }}>{v.from}</Text>
+              <Text style={{ fontSize: 11.5, color: colors.inkSoft }}>
+                {v.transcript || "Transcrevendo..."} · {new Date(v.receivedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </Text>
+            </View>
+          </View>
+        ))
+      )}
+
+      <SectionLabel>Viagem em organização</SectionLabel>
+      <View style={styles.tripCard}>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+          <Ionicons name="airplane-outline" size={16} color={colors.ink} />
+          <Text style={{ fontSize: 13.5, fontWeight: "600", color: colors.ink, marginLeft: 8 }}>
+            {EXAMPLE_TRIP.origin} → {EXAMPLE_TRIP.destination}
+          </Text>
+        </View>
+        <Text style={{ fontSize: 12, color: colors.inkSoft, marginBottom: 12 }}>{EXAMPLE_TRIP.date}</Text>
+
+        {flightState === "idle" && (
+          <Pressable style={styles.primaryButton} onPress={runFlightSearch}>
+            <Text style={{ color: "#fff", fontSize: 13.5, fontWeight: "600" }}>Buscar voos</Text>
+          </Pressable>
+        )}
+        {flightState === "loading" && <ActivityIndicator color={colors.brass} />}
+        {flightState === "error" && (
+          <Text style={{ fontSize: 12.5, color: colors.alert }}>
+            Configure o backend de viagens (Amadeus) pra buscar voos de verdade.
+          </Text>
+        )}
+        {flightState === "done" && flights?.length > 0 && (
+          <>
+            {flights.map((f) => (
+              <View key={f.id} style={styles.flightRow}>
+                <Text style={{ fontSize: 12.5, color: colors.ink }}>
+                  {f.segments?.[0]?.carrier} · {f.segments?.[0]?.from} → {f.segments?.[f.segments.length - 1]?.to}
+                </Text>
+                <Text style={{ fontSize: 12.5, fontWeight: "700", color: colors.brass }}>
+                  {f.currency} {f.price}
+                </Text>
+              </View>
+            ))}
+            <Pressable style={[styles.primaryButton, { marginTop: 8 }]}>
+              <Text style={{ color: "#fff", fontSize: 13.5, fontWeight: "600" }}>Revisar e confirmar reserva</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+
+      <SectionLabel>Pagamentos a vencer</SectionLabel>
+      <View style={styles.rowCard}>
+        <Ionicons name="wallet-outline" size={16} color={colors.inkSoft} />
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.ink }}>Fornecedor Poppys — insumos</Text>
+          <Text style={{ fontSize: 11.5, color: colors.inkSoft }}>Vence em 3 dias · R$ 3.180</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.inkSoft} />
+      </View>
+      <Text style={{ fontSize: 11, color: colors.inkSoft, marginTop: 8 }}>
+        Gestão de pagamentos ainda é um lembrete manual nesta versão — conciliação automática é um próximo passo (spec 4.4).
+      </Text>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.brass, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8, marginTop: 4 },
+  hint: { fontSize: 12.5, color: colors.inkSoft, marginBottom: 16 },
+  rowCard: { flexDirection: "row", alignItems: "center", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12, marginBottom: 10 },
+  tripCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: 16, marginBottom: 24 },
+  primaryButton: { backgroundColor: colors.ink, borderRadius: radius.md, paddingVertical: 11, alignItems: "center" },
+  flightRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.line },
+});

@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Assistente Pessoal",
+    "slug": "assistente-pessoal",
+    "scheme": "assistentepessoal",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#EEF1F6",
+      "image": "./assets/icon.png",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "br.com.assistentepessoal.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundColor": "#16213E"
+      },
+      "permissions": [
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ea19a9ed-c699-416f-b0fb-50dc9a85401f"
+      }
+    }
+  }
+}

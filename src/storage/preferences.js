@@ -1,0 +1,93 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// All keys the app stores locally. Kept in one place so "Excluir meus dados"
+// (LGPD - direito ao esquecimento) can reliably wipe everything.
+const KEYS = {
+  ONBOARDING_DONE: "anjel:onboardingDone",
+  PERMISSIONS: "anjel:permissions",
+  MEALS: "anjel:meals",
+  ACTIVITIES: "anjel:activities",
+  INTERESTS: "anjel:interests",
+  CONSENT_LOG: "anjel:consentLog",
+  BOOKS: "anjel:books",
+};
+
+const DEFAULT_PERMISSIONS = {
+  agenda: false,
+  notif: false,
+  loc: false,
+  mood: false,
+  music: false,
+};
+
+const DEFAULT_MEALS = { cafe: "07:30", almoco: "12:00", jantar: "19:30" };
+
+export async function getPermissions() {
+  const raw = await AsyncStorage.getItem(KEYS.PERMISSIONS);
+  return raw ? JSON.parse(raw) : DEFAULT_PERMISSIONS;
+}
+
+export async function setPermissions(perms) {
+  await AsyncStorage.setItem(KEYS.PERMISSIONS, JSON.stringify(perms));
+  // Auditoria: registra data/hora de cada mudança de consentimento (LGPD 5.2)
+  const log = await getConsentLog();
+  log.push({ perms, at: new Date().toISOString() });
+  await AsyncStorage.setItem(KEYS.CONSENT_LOG, JSON.stringify(log));
+}
+
+export async function getConsentLog() {
+  const raw = await AsyncStorage.getItem(KEYS.CONSENT_LOG);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function getMeals() {
+  const raw = await AsyncStorage.getItem(KEYS.MEALS);
+  return raw ? JSON.parse(raw) : DEFAULT_MEALS;
+}
+
+export async function setMeals(meals) {
+  await AsyncStorage.setItem(KEYS.MEALS, JSON.stringify(meals));
+}
+
+export async function getActivities() {
+  const raw = await AsyncStorage.getItem(KEYS.ACTIVITIES);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function setActivities(list) {
+  await AsyncStorage.setItem(KEYS.ACTIVITIES, JSON.stringify(list));
+}
+
+export async function getInterests() {
+  const raw = await AsyncStorage.getItem(KEYS.INTERESTS);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function setInterests(list) {
+  await AsyncStorage.setItem(KEYS.INTERESTS, JSON.stringify(list));
+}
+
+// Livros: [{ id, title, author, thumbnail, pct, current }]
+export async function getBooks() {
+  const raw = await AsyncStorage.getItem(KEYS.BOOKS);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function setBooks(books) {
+  await AsyncStorage.setItem(KEYS.BOOKS, JSON.stringify(books));
+}
+
+export async function isOnboardingDone() {
+  const raw = await AsyncStorage.getItem(KEYS.ONBOARDING_DONE);
+  return raw === "true";
+}
+
+export async function setOnboardingDone() {
+  await AsyncStorage.setItem(KEYS.ONBOARDING_DONE, "true");
+}
+
+// LGPD — direito ao esquecimento: apaga todos os dados locais do usuário.
+// Em produção, deve também disparar a exclusão no backend/servidor.
+export async function eraseAllUserData() {
+  await AsyncStorage.multiRemove(Object.values(KEYS));
+}
