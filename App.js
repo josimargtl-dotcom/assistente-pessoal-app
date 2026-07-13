@@ -13,6 +13,7 @@ import SummaryScreen from "./src/screens/SummaryScreen";
 import ReadingScreen from "./src/screens/ReadingScreen";
 import ExecutiveScreen from "./src/screens/ExecutiveScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
+import CityGuideScreen from "./src/screens/CityGuideScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -22,6 +23,7 @@ const TAB_ICONS = {
   Leitura: "book-outline",
   Executivo: "briefcase-outline",
   Ajustes: "settings-outline",
+  Guia: "compass-outline",
 };
 
 function MainTabs({ onDataErased }) {
@@ -40,6 +42,7 @@ function MainTabs({ onDataErased }) {
       <Tab.Screen name="Resumo" component={SummaryScreen} />
       <Tab.Screen name="Leitura" component={ReadingScreen} />
       <Tab.Screen name="Executivo" component={ExecutiveScreen} />
+      <Tab.Screen name="Guia" component={CityGuideScreen} />
       <Tab.Screen name="Ajustes">
         {() => <SettingsScreen onDataErased={onDataErased} />}
       </Tab.Screen>
