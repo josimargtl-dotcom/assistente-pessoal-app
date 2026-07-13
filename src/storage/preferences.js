@@ -11,6 +11,7 @@ const KEYS = {
   CONSENT_LOG: "anjel:consentLog",
   BOOKS: "anjel:books",
   TASKS: "anjel:tasks",
+  HABITS: "anjel:habits",
 };
 
 const DEFAULT_PERMISSIONS = {
@@ -87,6 +88,24 @@ export async function getTasks() {
 
 export async function setTasks(tasks) {
   await AsyncStorage.setItem(KEYS.TASKS, JSON.stringify(tasks));
+}
+
+
+// Hábitos: [{ id, name, icon, streak, lastCheckedDate }]
+const DEFAULT_HABITS = [
+  { id: "agua", name: "Beber água", icon: "water-outline", streak: 0, lastCheckedDate: null },
+  { id: "treino", name: "Treino", icon: "barbell-outline", streak: 0, lastCheckedDate: null },
+  { id: "sono", name: "Dormir bem", icon: "moon-outline", streak: 0, lastCheckedDate: null },
+  { id: "remedio", name: "Remédio", icon: "medkit-outline", streak: 0, lastCheckedDate: null },
+];
+
+export async function getHabits() {
+  const raw = await AsyncStorage.getItem(KEYS.HABITS);
+  return raw ? JSON.parse(raw) : DEFAULT_HABITS;
+}
+
+export async function setHabits(habits) {
+  await AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(habits));
 }
 
 export async function isOnboardingDone() {

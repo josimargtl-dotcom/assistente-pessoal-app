@@ -6,7 +6,35 @@ import { colors, radius } from "../theme";
 import HorizonMark from "../components/HorizonMark";
 import { isCalendarConnected } from "../services/googleCalendar";
 import { listRecentEmails } from "../services/gmail";
+import { getHabits, setHabits } from "../storage/preferences";
 import { listVoicemails, searchFlights } from "../services/executiveBackend";
+
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function HabitRow({ habit, onCheck }) {
+  const checkedToday = habit.lastCheckedDate === todayStr();
+  return (
+    <View style={styles.rowCard}>
+      <Ionicons name={habit.icon} size={16} color={colors.inkSoft} />
+      <View style={{ flex: 1, marginLeft: 10 }}>
+        <Text style={{ fontSize: 13, fontWeight: "500", color: colors.ink }}>{habit.name}</Text>
+        <Text style={{ fontSize: 11.5, color: colors.inkSoft }}>
+          {habit.streak > 0 ? `${habit.streak} dia${habit.streak > 1 ? "s" : ""} seguidos` : "Comece hoje"}
+        </Text>
+      </View>
+      <Pressable onPress={() => onCheck(habit.id)} disabled={checkedToday}>
+        <Ionicons
+          name={checkedToday ? "checkmark-circle" : "checkmark-circle-outline"}
+          size={26}
+          color={checkedToday ? colors.brass : colors.inkSoft}
+        />
+      </Pressable>
+    </View>
+  );
+}
 
 function SectionLabel({ children }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
@@ -40,6 +68,29 @@ export default function ExecutiveScreen() {
   const [voicemailError, setVoicemailError] = useState(null);
   const [flights, setFlights] = useState(null);
   const [flightState, setFlightState] = useState("idle"); // idle | loading | done | error
+  const [habits, setHabitsState] = useState([]);
+
+  const loadHabits = useCallback(async () => {
+    setHabitsState(await getHabits());
+  }, []);
+
+  function yesterdayStr() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  const checkHabit = async (id) => {
+    const today = todayStr();
+    const yesterday = yesterdayStr();
+    const updated = habits.map((h) => {
+      if (h.id !== id || h.lastCheckedDate === today) return h;
+      const continuing = h.lastCheckedDate === yesterday;
+      return { ...h, streak: continuing ? h.streak + 1 : 1, lastCheckedDate: today };
+    });
+    setHabitsState(updated);
+    await setHabits(updated);
+  };
 
   const load = useCallback(async () => {
     const connected = await isCalendarConnected();
@@ -62,7 +113,7 @@ export default function ExecutiveScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { load(); loadHabits(); }, [load, loadHabits]));
 
   const runFlightSearch = async () => {
     setFlightState("loading");
@@ -92,6 +143,12 @@ export default function ExecutiveScreen() {
       ) : (
         emails.map((e) => <EmailRow key={e.id} {...e} />)
       )}
+
+
+      <SectionLabel>Hábitos do dia</SectionLabel>
+      {habits.map((h) => (
+        <HabitRow key={h.id} habit={h} onCheck={checkHabit} />
+      ))}
 
       <SectionLabel>Recados por telefone</SectionLabel>
       {voicemailError ? (
