@@ -12,6 +12,8 @@ const KEYS = {
   BOOKS: "anjel:books",
   TASKS: "anjel:tasks",
   HABITS: "anjel:habits",
+  BILLS: "anjel:bills",
+  FINANCE_GOAL: "anjel:financeGoal",
 };
 
 const DEFAULT_PERMISSIONS = {
@@ -106,6 +108,27 @@ export async function getHabits() {
 
 export async function setHabits(habits) {
   await AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(habits));
+}
+
+
+// Contas a vencer: [{ id, name, amount, dueDate, paid }]
+export async function getBills() {
+  const raw = await AsyncStorage.getItem(KEYS.BILLS);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function setBills(bills) {
+  await AsyncStorage.setItem(KEYS.BILLS, JSON.stringify(bills));
+}
+
+// Meta financeira: { targetAmount, currentAmount, monthlyContribution }
+export async function getFinanceGoal() {
+  const raw = await AsyncStorage.getItem(KEYS.FINANCE_GOAL);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function setFinanceGoal(goal) {
+  await AsyncStorage.setItem(KEYS.FINANCE_GOAL, JSON.stringify(goal));
 }
 
 export async function isOnboardingDone() {

@@ -6,7 +6,8 @@ import { colors, radius } from "../theme";
 import HorizonMark from "../components/HorizonMark";
 import { isCalendarConnected } from "../services/googleCalendar";
 import { listRecentEmails } from "../services/gmail";
-import { getHabits, setHabits } from "../storage/preferences";
+import { getHabits, setHabits, getBills, setBills, getFinanceGoal, setFinanceGoal } from "../storage/preferences";
+import { TextInput } from "react-native";
 import { listVoicemails, searchFlights } from "../services/executiveBackend";
 
 
@@ -34,6 +35,41 @@ function HabitRow({ habit, onCheck }) {
       </Pressable>
     </View>
   );
+}
+
+
+function BillRow({ bill, onTogglePaid }) {
+  const daysLeft = Math.ceil((new Date(bill.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+  const isLate = daysLeft < 0 && !bill.paid;
+  return (
+    <Pressable onPress={() => onTogglePaid(bill.id)} style={styles.rowCard}>
+      <Ionicons
+        name={bill.paid ? "checkmark-circle" : isLate ? "alert-circle-outline" : "wallet-outline"}
+        size={16}
+        color={bill.paid ? colors.brass : isLate ? colors.alert : colors.inkSoft}
+      />
+      <View style={{ flex: 1, marginLeft: 10 }}>
+        <Text style={{ fontSize: 13, fontWeight: "500", color: colors.ink, textDecorationLine: bill.paid ? "line-through" : "none" }}>
+          {bill.name}
+        </Text>
+        <Text style={{ fontSize: 11.5, color: isLate ? colors.alert : colors.inkSoft }}>
+          {bill.paid ? "Pago" : isLate ? `Atrasado ${Math.abs(daysLeft)} dia${Math.abs(daysLeft) !== 1 ? "s" : ""}` : `Vence em ${daysLeft} dia${daysLeft !== 1 ? "s" : ""}`}
+          {" · R$ " + bill.amount.toFixed(2)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// Projeção simples de meta: quantos meses faltam no ritmo atual de aporte.
+function projectGoal(goal) {
+  if (!goal || !goal.monthlyContribution || goal.monthlyContribution <= 0) return null;
+  const remaining = goal.targetAmount - goal.currentAmount;
+  if (remaining <= 0) return { monthsLeft: 0, doneAlready: true };
+  const monthsLeft = Math.ceil(remaining / goal.monthlyContribution);
+  const years = Math.floor(monthsLeft / 12);
+  const months = monthsLeft % 12;
+  return { monthsLeft, years, months, doneAlready: false };
 }
 
 function SectionLabel({ children }) {
@@ -69,10 +105,42 @@ export default function ExecutiveScreen() {
   const [flights, setFlights] = useState(null);
   const [flightState, setFlightState] = useState("idle"); // idle | loading | done | error
   const [habits, setHabitsState] = useState([]);
+  const [bills, setBillsState] = useState([]);
+  const [goal, setGoalState] = useState(null);
+  const [goalInputs, setGoalInputs] = useState({ target: "", current: "", monthly: "" });
 
   const loadHabits = useCallback(async () => {
     setHabitsState(await getHabits());
   }, []);
+
+  const loadFinance = useCallback(async () => {
+    setBillsState(await getBills());
+    const storedGoal = await getFinanceGoal();
+    setGoalState(storedGoal);
+    if (storedGoal) {
+      setGoalInputs({
+        target: String(storedGoal.targetAmount),
+        current: String(storedGoal.currentAmount),
+        monthly: String(storedGoal.monthlyContribution),
+      });
+    }
+  }, []);
+
+  const toggleBillPaid = async (id) => {
+    const updated = bills.map((b) => (b.id === id ? { ...b, paid: !b.paid } : b));
+    setBillsState(updated);
+    await setBills(updated);
+  };
+
+  const saveGoal = async () => {
+    const target = parseFloat(goalInputs.target.replace(",", "."));
+    const current = parseFloat(goalInputs.current.replace(",", ".")) || 0;
+    const monthly = parseFloat(goalInputs.monthly.replace(",", ".")) || 0;
+    if (!target || target <= 0) return;
+    const newGoal = { targetAmount: target, currentAmount: current, monthlyContribution: monthly };
+    setGoalState(newGoal);
+    await setFinanceGoal(newGoal);
+  };
 
   function yesterdayStr() {
     const d = new Date();
@@ -113,7 +181,7 @@ export default function ExecutiveScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); loadHabits(); }, [load, loadHabits]));
+  useFocusEffect(useCallback(() => { load(); loadHabits(); loadFinance(); }, [load, loadHabits, loadFinance]));
 
   const runFlightSearch = async () => {
     setFlightState("loading");
@@ -211,18 +279,52 @@ export default function ExecutiveScreen() {
         )}
       </View>
 
-      <SectionLabel>Pagamentos a vencer</SectionLabel>
-      <View style={styles.rowCard}>
-        <Ionicons name="wallet-outline" size={16} color={colors.inkSoft} />
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.ink }}>Fornecedor Poppys — insumos</Text>
-          <Text style={{ fontSize: 11.5, color: colors.inkSoft }}>Vence em 3 dias · R$ 3.180</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.inkSoft} />
+      <SectionLabel>Contas a vencer</SectionLabel>
+      {bills.length === 0 ? (
+        <Text style={styles.hint}>Nenhuma conta cadastrada ainda.</Text>
+      ) : (
+        bills.map((b) => <BillRow key={b.id} bill={b} onTogglePaid={toggleBillPaid} />)
+      )}
+
+      <SectionLabel>Meta financeira</SectionLabel>
+      <View style={styles.tripCard}>
+        {goal && projectGoal(goal) && !projectGoal(goal).doneAlready && (
+          <Text style={{ fontSize: 13, color: colors.ink, marginBottom: 12 }}>
+            No ritmo atual, você bate R$ {goal.targetAmount.toLocaleString("pt-BR")} em{" "}
+            {projectGoal(goal).years > 0 ? `${projectGoal(goal).years} ano${projectGoal(goal).years > 1 ? "s" : ""}${projectGoal(goal).months > 0 ? ` e ${projectGoal(goal).months} mes${projectGoal(goal).months > 1 ? "es" : ""}` : ""}` : `${projectGoal(goal).months} mes${projectGoal(goal).months > 1 ? "es" : ""}`}.
+          </Text>
+        )}
+        {goal && projectGoal(goal)?.doneAlready && (
+          <Text style={{ fontSize: 13, color: colors.brass, fontWeight: "600", marginBottom: 12 }}>Meta já alcançada! 🎉</Text>
+        )}
+        <TextInput
+          value={goalInputs.target}
+          onChangeText={(v) => setGoalInputs((s) => ({ ...s, target: v }))}
+          placeholder="Meta (ex: 1000000)"
+          placeholderTextColor={colors.inkSoft}
+          keyboardType="numeric"
+          style={styles.financeInput}
+        />
+        <TextInput
+          value={goalInputs.current}
+          onChangeText={(v) => setGoalInputs((s) => ({ ...s, current: v }))}
+          placeholder="Valor atual"
+          placeholderTextColor={colors.inkSoft}
+          keyboardType="numeric"
+          style={styles.financeInput}
+        />
+        <TextInput
+          value={goalInputs.monthly}
+          onChangeText={(v) => setGoalInputs((s) => ({ ...s, monthly: v }))}
+          placeholder="Aporte mensal"
+          placeholderTextColor={colors.inkSoft}
+          keyboardType="numeric"
+          style={styles.financeInput}
+        />
+        <Pressable style={styles.primaryButton} onPress={saveGoal}>
+          <Text style={{ color: "#fff", fontSize: 13.5, fontWeight: "600" }}>Salvar meta</Text>
+        </Pressable>
       </View>
-      <Text style={{ fontSize: 11, color: colors.inkSoft, marginTop: 8 }}>
-        Gestão de pagamentos ainda é um lembrete manual nesta versão — conciliação automática é um próximo passo (spec 4.4).
-      </Text>
     </ScrollView>
   );
 }
@@ -234,4 +336,5 @@ const styles = StyleSheet.create({
   tripCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: 16, marginBottom: 24 },
   primaryButton: { backgroundColor: colors.ink, borderRadius: radius.md, paddingVertical: 11, alignItems: "center" },
   flightRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.line },
+  financeInput: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: colors.ink, marginBottom: 8 },
 });
