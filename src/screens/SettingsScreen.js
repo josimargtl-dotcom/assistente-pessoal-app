@@ -8,12 +8,10 @@ import { clearCalendarToken } from "../services/googleCalendar";
 import { clearSpotifyToken } from "../services/spotify";
 import { useGoogleCalendarAuth } from "../hooks/useGoogleCalendarAuth";
 import { useSpotifyAuth } from "../hooks/useSpotifyAuth";
-import { useNotificationBridge } from "../hooks/useNotificationBridge";
 
 export default function SettingsScreen({ onDataErased }) {
   const calendar = useGoogleCalendarAuth();
   const spotify = useSpotifyAuth();
-  const notifications = useNotificationBridge();
 
   const confirmErase = () => {
     Alert.alert(
@@ -84,24 +82,6 @@ export default function SettingsScreen({ onDataErased }) {
           )}
         </View>
 
-        <View style={[styles.row, styles.rowBorder]}>
-          <Ionicons name="notifications-outline" size={17} color={colors.ink} />
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={{ fontSize: 14, color: colors.ink }}>Notificações do celular</Text>
-            <Text style={{ fontSize: 11.5, color: colors.inkSoft }}>
-              {!notifications.available
-                ? "Precisa de um build próprio (não funciona no Expo Go)"
-                : notifications.granted
-                ? "Ativado"
-                : "Não ativado"}
-            </Text>
-          </View>
-          {notifications.available && !notifications.granted && (
-            <Pressable onPress={notifications.requestAccess}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.brass }}>Ativar</Text>
-            </Pressable>
-          )}
-        </View>
       </View>
 
       <Text style={styles.sectionLabel}>Privacidade</Text>
