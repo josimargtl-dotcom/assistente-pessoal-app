@@ -9,6 +9,7 @@ import { getMeals, getInterests, getTasks, setTasks, getHabits } from "../storag
 import { TextInput, Pressable } from "react-native";
 import { isCalendarConnected, fetchTodayEvents } from "../services/googleCalendar";
 import { nearbyLeisure } from "../services/places";
+import { scheduleProactiveAlerts } from "../services/proactivity";
 
 function TimelineItem({ time, icon, title, tag, last }) {
   return (
@@ -123,6 +124,7 @@ export default function SummaryScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("media");
   const [habits, setHabitsState] = useState([]);
+  const [alertsStatus, setAlertsStatus] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,6 +141,11 @@ export default function SummaryScreen() {
         events = await fetchTodayEvents();
       }
       setTimeline(buildTimeline(meals, events));
+
+      if (hasCalendar && events.length > 0) {
+        const result = await scheduleProactiveAlerts(events, meals);
+        setAlertsStatus(result);
+      }
     } catch (e) {
       setError(e.message || "Não deu pra carregar sua agenda agora.");
     } finally {
@@ -220,6 +227,24 @@ export default function SummaryScreen() {
         );
       })()}
 
+
+
+      {alertsStatus?.reason === "sem_permissao" && (
+        <View style={styles.hintCard}>
+          <Ionicons name="notifications-off-outline" size={16} color={colors.brass} />
+          <Text style={{ fontSize: 12.5, color: colors.ink, marginLeft: 8, flex: 1 }}>
+            Ative as notificações pra receber avisos antes dos seus compromissos.
+          </Text>
+        </View>
+      )}
+      {alertsStatus?.scheduled > 0 && (
+        <View style={[styles.hintCard, { backgroundColor: "#EAF1E8", borderColor: "#B7CFAF" }]}>
+          <Ionicons name="notifications-outline" size={16} color="#4A7A4A" />
+          <Text style={{ fontSize: 12.5, color: colors.ink, marginLeft: 8, flex: 1 }}>
+            {alertsStatus.scheduled} aviso{alertsStatus.scheduled > 1 ? "s" : ""} programado{alertsStatus.scheduled > 1 ? "s" : ""} pros seus compromissos de hoje.
+          </Text>
+        </View>
+      )}
 
       {!connected && (
         <View style={styles.hintCard}>
