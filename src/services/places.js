@@ -3,7 +3,7 @@
 // por assinatura do app Android (SHA-1 + package name) antes de publicar —
 // diferente da Calendar/Gmail, essa chave *pode* ir no app porque a Places
 // API é feita pra uso client-side, desde que restrita dessa forma.
-const API_KEY = "SUA_PLACES_API_KEY";
+const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 // Mapa simples de interesses (cadastrados no onboarding) -> tipos de lugar do Google Places.
 const INTEREST_TO_TYPE = {
