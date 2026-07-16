@@ -7,6 +7,8 @@ import HorizonMark from "../components/HorizonMark";
 import { isCalendarConnected } from "../services/googleCalendar";
 import { listRecentEmails } from "../services/gmail";
 import { getHabits, setHabits, getBills, setBills, getFinanceGoal, setFinanceGoal } from "../storage/preferences";
+import { getDollarRate, getMarketNews } from "../services/market";
+import { Linking } from "react-native";
 import { TextInput } from "react-native";
 import { listVoicemails, searchFlights } from "../services/executiveBackend";
 
@@ -108,9 +110,23 @@ export default function ExecutiveScreen() {
   const [bills, setBillsState] = useState([]);
   const [goal, setGoalState] = useState(null);
   const [goalInputs, setGoalInputs] = useState({ target: "", current: "", monthly: "" });
+  const [dollar, setDollar] = useState(null);
+  const [news, setNews] = useState([]);
+  const [marketError, setMarketError] = useState(null);
 
   const loadHabits = useCallback(async () => {
     setHabitsState(await getHabits());
+  }, []);
+
+  const loadMarket = useCallback(async () => {
+    try {
+      const [rate, headlines] = await Promise.all([getDollarRate(), getMarketNews()]);
+      setDollar(rate);
+      setNews(headlines);
+      setMarketError(null);
+    } catch (e) {
+      setMarketError("Não foi possível carregar os dados de mercado agora.");
+    }
   }, []);
 
   const loadFinance = useCallback(async () => {
@@ -181,7 +197,7 @@ export default function ExecutiveScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); loadHabits(); loadFinance(); }, [load, loadHabits, loadFinance]));
+  useFocusEffect(useCallback(() => { load(); loadHabits(); loadFinance(); loadMarket(); }, [load, loadHabits, loadFinance, loadMarket]));
 
   const runFlightSearch = async () => {
     setFlightState("loading");
@@ -278,6 +294,33 @@ export default function ExecutiveScreen() {
           </>
         )}
       </View>
+
+
+      <SectionLabel>Mercado</SectionLabel>
+      {marketError ? (
+        <Text style={{ fontSize: 12.5, color: colors.inkSoft, marginBottom: 16 }}>{marketError}</Text>
+      ) : (
+        <View style={styles.tripCard}>
+          {dollar ? (
+            <View style={{ flexDirection: "row", alignItems: "baseline", marginBottom: 12 }}>
+              <Text style={{ fontSize: 22, fontWeight: "700", color: colors.ink }}>
+                US$ 1 = R$ {dollar.bid.toFixed(2)}
+              </Text>
+              <Text style={{ fontSize: 13, marginLeft: 8, color: dollar.variation >= 0 ? "#4A7A4A" : colors.alert }}>
+                {dollar.variation >= 0 ? "+" : ""}{dollar.variation.toFixed(2)}%
+              </Text>
+            </View>
+          ) : (
+            <ActivityIndicator color={colors.brass} style={{ marginBottom: 12 }} />
+          )}
+          {news.map((n) => (
+            <Pressable key={n.id} onPress={() => Linking.openURL(n.link)} style={{ marginBottom: 10 }}>
+              <Text style={{ fontSize: 13, color: colors.ink }} numberOfLines={2}>{n.title}</Text>
+              <Text style={{ fontSize: 11, color: colors.inkSoft, marginTop: 2 }}>{n.source}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       <SectionLabel>Contas a vencer</SectionLabel>
       {bills.length === 0 ? (

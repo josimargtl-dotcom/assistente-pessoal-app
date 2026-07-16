@@ -9,7 +9,7 @@ import { getMeals, getInterests, getTasks, setTasks, getHabits } from "../storag
 import { TextInput, Pressable } from "react-native";
 import { isCalendarConnected, fetchTodayEvents } from "../services/googleCalendar";
 import { nearbyLeisure } from "../services/places";
-import { scheduleProactiveAlerts } from "../services/proactivity";
+import { scheduleProactiveAlerts, scheduleMotivationalMessages } from "../services/proactivity";
 
 function TimelineItem({ time, icon, title, tag, last }) {
   return (
@@ -132,6 +132,7 @@ export default function SummaryScreen() {
     try {
       const meals = await getMeals();
       const storedHabits = await getHabits();
+      scheduleMotivationalMessages();
       setHabitsState(storedHabits);
       const hasCalendar = await isCalendarConnected();
       setConnected(hasCalendar);
